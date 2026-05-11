@@ -21,7 +21,7 @@ test {
 }
 
 tasks.register('texttest', JavaExec) {
-    main = "com.gildedrose.TexttestFixture"
+    mainClass = "com.gildedrose.TexttestFixture"
     classpath = sourceSets.test.runtimeClasspath
     args "30"
 }

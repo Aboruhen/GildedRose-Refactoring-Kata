@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gilded Rose — updateQuality() Flow</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #141414;
+      color: rgba(228,228,228,0.922);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    #app {
+      padding: 20px 24px;
+      max-width: 980px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 590;
+      line-height: 30px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 590;
+      line-height: 22px;
+    }
+    .text-secondary { color: rgba(228,228,228,0.553); font-size: 12px; line-height: 16px; }
+    .divider { height: 1px; background: rgba(228,228,228,0.078); }
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .stat { display: flex; flex-direction: column; gap: 4px; }
+    .stat-value { font-size: 18px; font-weight: 590; }
+    .stat-label { font-size: 12px; color: rgba(228,228,228,0.553); }
+    .svg-wrap { overflow-x: auto; }
+    svg { display: block; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      line-height: 16px;
+      border: 1px solid;
+    }
+    .pill-neutral { color: rgba(228,228,228,0.553); border-color: rgba(228,228,228,0.122); }
+    .pill-info    { color: #599CE7; border-color: rgba(89,156,231,0.4); }
+    .pill-warning { color: #d4ae24; border-color: rgba(212,174,36,0.4); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Gilded Rose — updateQuality() Flow</h1>
+    <p class="text-secondary">
+      Every item passes through item-specific quality rules in parallel branches,
+      then through shared SellIn decrement and boundary enforcement.
+      Sulfuras bypasses the SellIn step (dashed arrow).
+    </p>
+
+    <div class="grid-5">
+      <div class="stat"><div class="stat-value">Normal</div><div class="stat-label">-1 or -2 · floor 0</div></div>
+      <div class="stat"><div class="stat-value">Aged Brie</div><div class="stat-label">+1 or +2 · cap 50</div></div>
+      <div class="stat"><div class="stat-value">Sulfuras</div><div class="stat-label">fixed at 80</div></div>
+      <div class="stat"><div class="stat-value">Backstage</div><div class="stat-label">+1/+2/+3 or 0</div></div>
+      <div class="stat"><div class="stat-value">Conjured</div><div class="stat-label">-2 or -4 · floor 0</div></div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="svg-wrap"><svg id="flow-svg"></svg></div>
+    <div class="divider"></div>
+
+    <h3>Legend</h3>
+    <div class="legend">
+      <span class="pill pill-info">Accent border — entry / exit / dispatch</span>
+      <span class="pill pill-neutral">Flat fill — item type branch</span>
+      <span class="pill pill-neutral">Outlined — quality rule</span>
+      <span class="pill pill-neutral">Tinted — shared step</span>
+      <span class="pill pill-warning">Dashed line — Sulfuras bypass (skips SellIn)</span>
+    </div>
+  </div>
+
+  <script>
+    const NW = 158, NH = 40;
+    const RANK_GAP = 52, NODE_GAP = 18, PAD = 32;
+
+    // Dark theme tokens
+    const C = {
+      bgElevated:      '#181818',
+      fillSecondary:   'rgba(228,228,228,0.118)',
+      fillTertiary:    'rgba(228,228,228,0.067)',
+      strokePrimary:   'rgba(228,228,228,0.200)',
+      strokeSecondary: 'rgba(228,228,228,0.122)',
+      strokeTertiary:  'rgba(228,228,228,0.078)',
+      accent:          '#599CE7',
+      textPrimary:     'rgba(228,228,228,0.922)',
+      textTertiary:    'rgba(228,228,228,0.369)',
+      font:            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    };
+
+    const NODES = [
+      'start', 'each_item', 'dispatch',
+      'type_sulfuras', 'type_brie', 'type_pass', 'type_normal', 'type_conjured',
+      'rule_sulfuras', 'rule_brie', 'rule_pass', 'rule_normal', 'rule_conjured',
+      'sellin', 'bounds', 'end',
+    ];
+
+    const EDGES = [
+      { from: 'start',         to: 'each_item'     },
+      { from: 'each_item',     to: 'dispatch'      },
+      { from: 'dispatch',      to: 'type_sulfuras' },
+      { from: 'dispatch',      to: 'type_brie'     },
+      { from: 'dispatch',      to: 'type_pass'     },
+      { from: 'dispatch',      to: 'type_normal'   },
+      { from: 'dispatch',      to: 'type_conjured' },
+      { from: 'type_sulfuras', to: 'rule_sulfuras' },
+      { from: 'type_brie',     to: 'rule_brie'     },
+      { from: 'type_pass',     to: 'rule_pass'     },
+      { from: 'type_normal',   to: 'rule_normal'   },
+      { from: 'type_conjured', to: 'rule_conjured' },
+      { from: 'rule_sulfuras', to: 'bounds'        },
+      { from: 'rule_brie',     to: 'sellin'        },
+      { from: 'rule_pass',     to: 'sellin'        },
+      { from: 'rule_normal',   to: 'sellin'        },
+      { from: 'rule_conjured', to: 'sellin'        },
+      { from: 'sellin',        to: 'bounds'        },
+      { from: 'bounds',        to: 'end'           },
+    ];
+
+    const META = {
+      start:         { label: 'updateQuality()',   sub: '',                        kind: 'terminal'  },
+      each_item:     { label: 'For each Item',     sub: 'items[] loop',            kind: 'process'   },
+      dispatch:      { label: 'Match item name',   sub: '',                        kind: 'decision'  },
+      type_sulfuras: { label: 'Sulfuras',          sub: 'Hand of Ragnaros',        kind: 'itemtype'  },
+      type_brie:     { label: 'Aged Brie',         sub: '',                        kind: 'itemtype'  },
+      type_pass:     { label: 'Backstage Pass',    sub: '',                        kind: 'itemtype'  },
+      type_normal:   { label: 'Normal Item',       sub: '(any other name)',        kind: 'itemtype'  },
+      type_conjured: { label: 'Conjured',          sub: '',                        kind: 'itemtype'  },
+      rule_sulfuras: { label: 'No changes',        sub: 'quality=80, sellIn fixed',kind: 'rule'      },
+      rule_brie:     { label: '+1 or +2 quality',  sub: 'cap at 50',              kind: 'rule'      },
+      rule_pass:     { label: '+1/+2/+3 quality',  sub: 'or 0 post-concert',      kind: 'rule'      },
+      rule_normal:   { label: '-1 or -2 quality',  sub: 'floor at 0',             kind: 'rule'      },
+      rule_conjured: { label: '-2 or -4 quality',  sub: 'floor at 0',             kind: 'rule'      },
+      sellin:        { label: 'Decrement SellIn',  sub: '(skip Sulfuras)',         kind: 'shared'    },
+      bounds:        { label: 'Enforce bounds',    sub: '0 \u2264 q \u2264 50',   kind: 'shared'    },
+      end:           { label: 'return items',      sub: '',                        kind: 'terminal'  },
+    };
+
+    // ── DAG layout ─────────────────────────────────────────────────────────────
+
+    const outEdges = {};
+    NODES.forEach(id => outEdges[id] = []);
+    EDGES.forEach(e => outEdges[e.from].push(e.to));
+
+    const inDegree = {};
+    NODES.forEach(id => inDegree[id] = 0);
+    EDGES.forEach(e => inDegree[e.to]++);
+
+    // Rank = longest path from any root
+    const rank = {};
+    NODES.forEach(id => rank[id] = 0);
+    const deg = { ...inDegree };
+    const queue = NODES.filter(id => deg[id] === 0);
+    while (queue.length) {
+      const node = queue.shift();
+      outEdges[node].forEach(next => {
+        rank[next] = Math.max(rank[next], rank[node] + 1);
+        if (--deg[next] === 0) queue.push(next);
+      });
+    }
+
+    // Group nodes by rank, preserving NODES input order
+    const rankGroups = {};
+    NODES.forEach(id => {
+      const r = rank[id];
+      (rankGroups[r] = rankGroups[r] || []).push(id);
+    });
+
+    const maxInRank    = Math.max(...Object.values(rankGroups).map(g => g.length));
+    const contentWidth = maxInRank * NW + (maxInRank - 1) * NODE_GAP;
+    const svgWidth     = contentWidth + 2 * PAD;
+
+    const pos = {};
+    Object.entries(rankGroups).forEach(([rStr, group]) => {
+      const r   = Number(rStr);
+      const gw  = group.length * NW + (group.length - 1) * NODE_GAP;
+      const x0  = PAD + (contentWidth - gw) / 2;
+      const y   = PAD + r * (NH + RANK_GAP);
+      group.forEach((id, i) => {
+        pos[id] = { x: x0 + i * (NW + NODE_GAP), y };
+      });
+    });
+
+    const maxRank  = Math.max(...Object.values(rank));
+    const svgHeight = PAD + (maxRank + 1) * (NH + RANK_GAP) - RANK_GAP + PAD;
+
+    // ── Style helpers ────────────────────────────────────────────────────────────
+
+    function nodeFill(kind) {
+      if (kind === 'terminal' || kind === 'rule') return C.bgElevated;
+      if (kind === 'shared') return C.fillTertiary;
+      return C.fillSecondary;
+    }
+    function nodeStroke(kind) {
+      return (kind === 'terminal' || kind === 'decision') ? C.accent : C.strokeSecondary;
+    }
+    function nodeStrokeWidth(kind) {
+      return (kind === 'terminal' || kind === 'decision') ? 1.5 : 1;
+    }
+    function nodeRx(kind) {
+      return kind === 'terminal' ? 20 : kind === 'decision' ? 6 : 4;
+    }
+    function labelFill(kind) {
+      return kind === 'terminal' ? C.accent : C.textPrimary;
+    }
+    function labelWeight(kind) {
+      return (kind === 'terminal' || kind === 'itemtype') ? '600' : '400';
+    }
+
+    // ── SVG helpers ──────────────────────────────────────────────────────────────
+
+    const NS = 'http://www.w3.org/2000/svg';
+    function el(tag, attrs, text) {
+      const e = document.createElementNS(NS, tag);
+      for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+      if (text != null) e.textContent = text;
+      return e;
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────────
+
+    const svg = document.getElementById('flow-svg');
+    svg.setAttribute('width',  svgWidth);
+    svg.setAttribute('height', svgHeight);
+
+    const ARROW_SIZE = 7, ARROW_HALF = 4;
+
+    // Edges (drawn first, behind nodes)
+    EDGES.forEach(e => {
+      const bypass = e.from === 'rule_sulfuras';
+      const sp = pos[e.from], tp = pos[e.to];
+      const sx = sp.x + NW / 2,  sy = sp.y + NH;
+      const tx = tp.x + NW / 2,  ty = tp.y;
+      const dy = ty - sy,         cp = dy * 0.45;
+      const ey = ty - ARROW_SIZE;
+      const d  = `M${sx},${sy} C${sx},${sy+cp} ${tx},${ey-cp} ${tx},${ey}`;
+      const stroke = bypass ? C.strokeTertiary : C.strokePrimary;
+
+      const g    = el('g');
+      const path = el('path', {
+        d, fill: 'none', stroke,
+        'stroke-width':    bypass ? 1 : 1.5,
+        'stroke-dasharray': bypass ? '5 3' : '',
+      });
+      const tip = el('polygon', {
+        points: `${tx},${ty} ${tx-ARROW_HALF},${ty-ARROW_SIZE} ${tx+ARROW_HALF},${ty-ARROW_SIZE}`,
+        fill: stroke,
+      });
+      g.append(path, tip);
+      svg.appendChild(g);
+    });
+
+    // Nodes
+    NODES.forEach(id => {
+      const p    = pos[id];
+      const meta = META[id];
+      const cx   = p.x + NW / 2;
+      const cy   = p.y + NH / 2;
+      const sub  = !!meta.sub;
+
+      const g = el('g');
+
+      g.appendChild(el('rect', {
+        x: p.x, y: p.y, width: NW, height: NH,
+        rx:            nodeRx(meta.kind),
+        fill:          nodeFill(meta.kind),
+        stroke:        nodeStroke(meta.kind),
+        'stroke-width': nodeStrokeWidth(meta.kind),
+      }));
+
+      g.appendChild(el('text', {
+        x: cx, y: sub ? cy - 5 : cy + 4,
+        'text-anchor': 'middle',
+        'font-size':   11,
+        'font-weight': labelWeight(meta.kind),
+        'font-family': C.font,
+        fill:          labelFill(meta.kind),
+      }, meta.label));
+
+      if (sub) {
+        g.appendChild(el('text', {
+          x: cx, y: cy + 9,
+          'text-anchor': 'middle',
+          'font-size':   9.5,
+          'font-family': C.font,
+          fill:          C.textTertiary,
+        }, meta.sub));
+      }
+
+      svg.appendChild(g);
+    });
+  </script>
+</body>
+</html>
