@@ -34,22 +34,6 @@ This structure satisfies the **Open/Closed Principle**: adding a new item type r
 | [docs/Architecture.md](docs/Architecture.md) | Full architecture reference: module layout, domain model, class responsibilities, quality rules table, factory configuration, and test design |
 | [GildedRoseRequirements.md](GildedRoseRequirements.md) | Original business requirements specification |
 
----
-
-## Quality Rules at a Glance
-
-| Item Type | sellIn | Quality change (before sell) | Quality change (after sell) | Bounds |
-|-----------|--------|-----------------------------|-----------------------------|--------|
-| Normal | −1/day | −1 | −2 | [0, 50] |
-| Aged Brie | −1/day | +1 | +2 | [0, 50] |
-| Sulfuras | none | 0 | 0 | fixed 80 |
-| Backstage Pass | −1/day | +1 / +2 / +3 (tiered) | drops to 0 | [0, 50] |
-| Conjured | −1/day | −2 | −4 | [0, 50] |
-
-Backstage pass tiers: `sellIn > 10` → +1 · `sellIn ∈ [5, 10]` → +2 · `sellIn ∈ [0, 4]` → +3
-
----
-
 ## Running the Project
 
 All commands should be run from the `Java/` directory.
