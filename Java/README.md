@@ -2,7 +2,7 @@
 
 ## Documentation
 
-- [Architecture](docs/Architecture.md) — design overview, class structure, quality rules, configuration, and test strategy
+- [Architecture](../docs/Architecture.md) — design overview, class structure, quality rules, configuration, and test strategy
 
 ## Run the TextTest Fixture from Command-Line
 
