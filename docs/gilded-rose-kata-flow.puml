@@ -1,0 +1,67 @@
+@startuml gilded-rose-kata-flow
+skinparam backgroundColor #white
+skinparam activityBackgroundColor #1e1e1e
+skinparam activityBorderColor #6b7280
+skinparam activityFontColor #e5e7eb
+skinparam activityDiamondBackgroundColor #1e2a3a
+skinparam activityDiamondBorderColor #6b7280
+skinparam activityDiamondFontColor #e5e7eb
+skinparam arrowColor #6b7280
+skinparam activityStartColor #4f8ef7
+skinparam activityEndColor #4f8ef7
+
+title updateQuality
+
+start
+
+while (for each item in items) is (next item)
+
+  switch (ItemUpdaterFactory.forItem(item))
+
+  case (name == "Sulfuras,\nHand of Ragnaros")
+    :<color:#9ca3af>No-op\nquality=80, sellIn fixed>;<<#1e2019>>
+
+  case (name == "Aged Brie")
+    :sellIn--;<<#1a2e1e>>
+    if (sellIn < 0?) then (yes\nincrease=2)
+      :quality = min(50, quality + 2);<<#1a2e1e>>
+    else (no\nincrease=1)
+      :quality = min(50, quality + 1);<<#1a2e1e>>
+    endif
+
+  case (name == "Backstage passes...")
+    :sellIn--;<<#1a1e2e>>
+    if (sellIn < 0?) then (yes)
+      :quality = 0;<<#1a1e2e>>
+    else (no)
+      :increase = 1;<<#1a1e2e>>
+      if (sellIn < 10?) then (yes)
+        :increase++;<<#1a1e2e>>
+        if (sellIn < 5?) then (yes)
+          :increase++;<<#1a1e2e>>
+        endif
+      endif
+      :quality = min(50, quality + increase);<<#1a1e2e>>
+    endif
+
+  case (name.startsWith("Conjured"))
+    :sellIn--;<<#2a1e2e>>
+    if (sellIn < 0?) then (yes\ndegradation=4)
+      :quality = max(0, quality - 4);<<#2a1e2e>>
+    else (no\ndegradation=2)
+      :quality = max(0, quality - 2);<<#2a1e2e>>
+    endif
+
+  case (otherwise)
+    :sellIn--;<<#1e1e1e>>
+    if (sellIn < 0?) then (yes\ndegradation=2)
+      :quality = max(0, quality - 2);<<#1e1e1e>>
+    else (no\ndegradation=1)
+      :quality = max(0, quality - 1);<<#1e1e1e>>
+    endif
+  endswitch
+
+endwhile (done)
+
+stop
+@enduml
